@@ -1,6 +1,6 @@
 FROM python:3.9-slim
 
-COPY ./app/requirements.txt ./requirements.txt
+COPY ./requirements.txt ./requirements.txt
 RUN pip3 install -r requirements.txt
 
 EXPOSE 8501

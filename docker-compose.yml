@@ -183,9 +183,6 @@ services:
       - DJ_URL=http://dj:8000
     volumes:
       - ./chat-demo/chat-backend:/workspace
-      - type: bind
-        source: ${FASTTEXT_MODEL}
-        target: /workspace/cc.en.300.bin
     command: "python3 /workspace/app.py"
     depends_on:
       - dj

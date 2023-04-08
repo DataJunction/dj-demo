@@ -9,27 +9,28 @@ import torch
 import pandas as pd
 import os
 import sys
+import logging
+import json
+import time
 
 openai.api_key = os.environ["OPENAI_API_KEY"]
 DJ_URL = os.environ["DJ_URL"]
-  
 
-print("READING METRIC DATA")
+logging.basicConfig(level=logging.INFO)
+
 metrics_json = requests.get(
     f"{DJ_URL}/metrics",
 ).json()
 
 metrics = pd.DataFrame(metrics_json)
 
-print("LOADING METRIC QUERY MODEL")
-MODEL = 'all-MiniLM-L6-v2'
-embedder = SentenceTransformer(MODEL)
-
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+logging.info("Loaded metrics data")
 
 
-print("EMBEDDING DATA")
+embedder = SentenceTransformer('all-MiniLM-L6-v2')
 metric_embeddings = embedder.encode(metrics.description, convert_to_tensor=True)
+
+logging.info("Loaded metric query model and embedded data")
 
 def query_node(query: str, top_k = 5):
     """given a query for a dimension or metric name, queries for the nearest names 
@@ -58,21 +59,24 @@ def make_request(utterance: str, max_retries: int = 5, model: str ='gpt-3.5-turb
 
         except RateLimitError:
             # Handle rate limiting error
-            print(
-                f"####### OpenAI rate limit reached, waiting for 1 minute #######",
-            )
+            logging.error(f"OpenAI rate limit reached, waiting for 1 minute. Retries so far: {retries}")
             time.sleep(60)  # Wait 1 minute before trying again
             retries += 1  # Increment the number of retries
 
     if retries == max_retries:
-        print(
-            f"Maximum number of retries exceeded. Giving up.",
-        )
+        logging.error("Maximum number of retries exceeded. Giving up.")
         sys.exit(1)
         
 
 app = FastAPI()
 
+schema = '''
+    {
+        "metric": required string of single metric name chosen,
+        "groupbys": [array of string of columns chosen],
+        "filters": [array of string of sql expressions using columns chosen],
+    }
+'''
 
 @app.get("/query/{query}")
 def query(query: str, n: int = 5, rel:float = 0):
@@ -96,22 +100,22 @@ def query(query: str, n: int = 5, rel:float = 0):
     You may choose only a single metric.
     Be sure to only use columns from the list for your chosen metric in the dimension and filter query parameters.
 
-    Respond with only-
+    Respond with only json in the schema below and no additional commentary:
 
-    Metric: your chosen metric name
-    GroupBys: comma-separated values for your chosen columns
-    Filters: comma-separated valid SQL filter expressions using your chosen columns
+    {schema}
     """.strip()
     
     request_info = make_request(request_prompt)
+    logging.info(f"Schema response: ", request_info)
+    request_json = json.loads(request_info)
 
-    metric, dimensions, filters = request_info.split('\n')
-
-    metric=metric.replace("Metric:", "").strip()
-    dimensions=dimensions.replace("GroupBys:", "").strip()
-    filters=filters.replace("Filters:", "").strip()
+    metric=request_json['metric']
+    dimensions=",".join(dim.strip() for dim in request_json['groupbys'])
+    filters=",".join(dim.strip() for dim in request_json['filters'])
     
     request_url=f"{DJ_URL}/data/{metric}/?dimensions={dimensions}&filters={filters}"
+    
+    logging.info(f"Querying URL: {request_url}")
     
     metrics_data = requests.get(request_url)
     return metrics_data.json()
