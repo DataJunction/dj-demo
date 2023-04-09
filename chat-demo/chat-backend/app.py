@@ -75,7 +75,8 @@ app = FastAPI()
 def query(query: str, n: int = 5, rel:float = 0):
     metric_query_prompt = f"""
     From the query '{query}', determine what the metric being calculated is.
-    If the query wants sql, then 'data' is false otherwise it is true. 
+    If the query wants sql code, then 'data' is false otherwise it is true. 
+    Queries that ask for code, how to calculate something or similar are asking for sql code and so data should be false.
     If the query is irrelevant to data or sql queries, then 'valid' is false otherwise it is true.
     A valid query is one that requests a metric which is some aggregation of data usually numeric.
     
@@ -116,7 +117,8 @@ def query(query: str, n: int = 5, rel:float = 0):
     You may choose only a single metric.
     Be sure to only use columns from the list for your chosen metric in the dimension and filter query parameters.
     If you do not believe any of the choices are relevant, leave the 'metric' field as an empty string.
-
+    Choose as few columns for groupbys and filters as you think you can to still satisfy the query.
+    
     Respond with only json in the schema below and no additional commentary:
 
     {{
