@@ -60,7 +60,7 @@ def main():
         if response.status_code==200:
             data = response.json()
             if 'sql' in data:
-                st.session_state.results = data['sql']
+                st.session_state.results = '```SQL\n'+data['sql']+'\n```'
             elif 'message' in data:
                 st.session_state.results = data['message']
             elif 'results' in data:
@@ -98,7 +98,10 @@ def main():
                 st.write(st.session_state.results)
                 st.bar_chart(st.session_state.results)
             if isinstance(st.session_state.results, str):
-                f"### {st.session_state.results}"
+                if st.session_state.results.startswith('`'):
+                    st.write(st.session_state.results)
+                else:
+                    f"### {st.session_state.results}"
                 
 sidebar()
 main()
